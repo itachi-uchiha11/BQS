@@ -181,6 +181,6 @@ public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
         QueryBuilder opt = optimize_boolquerybuilder(unopt);
         String x2 = opt.toString();
         System.out.println(x2);
-
     }
+    //Should be only in Final Branch
 }
