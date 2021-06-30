@@ -82,25 +82,9 @@ public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
 
     private BoolQueryBuilderT handleCompound(Iterator<Formula> formulae,BooleanClauseType clauseType,State state){
         BoolQueryBuilderT boolQueryBuilder = queryBuilder.newBoolQuery();
-        switch(clauseType){
-            case MUST:{
-                while(formulae.hasNext()){
-                    Formula formula = formulae.next();
-                    queryBuilder.addClause(boolQueryBuilder,clauseType,convert_to_Query(formula,state));
-                }
-            }
-            case SHOULD:{
-                while(formulae.hasNext()){
-                    Formula formula = formulae.next();
-                    queryBuilder.addClause(boolQueryBuilder,clauseType,convert_to_Query(formula,state));
-                }
-            }
-            case MUST_NOT:{
-                while(formulae.hasNext()){
-                    Formula formula = formulae.next();
-                    queryBuilder.addClause(boolQueryBuilder,clauseType,convert_to_Query(formula,state));
-                }
-            }
+        while(formulae.hasNext()){
+            Formula formula = formulae.next();
+            queryBuilder.addClause(boolQueryBuilder,clauseType,convert_to_Query(formula,state));
         }
         return boolQueryBuilder;
     }
