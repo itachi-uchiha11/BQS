@@ -1,8 +1,6 @@
 import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.queryparser.xml.ParserException;
-import org.elasticsearch.common.netty.util.internal.StringUtil;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.MatchAllQueryBuilder;
 import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.logicng.formulas.*;
@@ -27,8 +25,8 @@ public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
         this.queryBuilder = queryBuilder;
     }
     public static QueryBuilder optimize_boolquerybuilder(BoolQueryBuilder boolquerybuilder){
-        EsBoolFilterHelper2 esBoolFilterHelper2 = new EsBoolFilterHelper2();
-        return new BQS<>(BoolQueryBuilder.class,esBoolFilterHelper2,esBoolFilterHelper2,esBoolFilterHelper2).optimize(boolquerybuilder);
+        EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
+        return new BQS<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper).optimize(boolquerybuilder);
     }
     private QueryBuilderT optimize(BoolQueryBuilderT boolQueryBuilder){
         State<QueryBuilderT> state = new State<>(equalsAndHashCodeSupplier);
@@ -166,21 +164,5 @@ public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
             return equalsAndHashCodeSupplier.hashCode(obj);
         }
     }
-    public static void main(String[] args) throws ParserException, IOException {
-        BoolQueryBuilder unopt = new BoolQueryBuilder();
-        BoolQueryBuilder temp = new BoolQueryBuilder();
-        MatchQueryBuilder temp2 = new MatchQueryBuilder("a","India");
-        MatchQueryBuilder temp3 = new MatchQueryBuilder("b",1);
-        MatchQueryBuilder temp4 = new MatchQueryBuilder("b",2);
-        MatchQueryBuilder temp5 = new MatchQueryBuilder("b",3);
-        unopt.should(new BoolQueryBuilder().must(temp2).must(temp3));
-        unopt.should(new BoolQueryBuilder().must(temp2).must(temp4));
-        unopt.should(new BoolQueryBuilder().must(temp2).must(temp5));
-        String x = unopt.toString();
-        System.out.println(x);
-        QueryBuilder opt = optimize_boolquerybuilder(unopt);
-        String x2 = opt.toString();
-        System.out.println(x2);
-    }
-    //Should be only in Final Branch
+
 }

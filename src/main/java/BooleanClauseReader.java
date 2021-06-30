@@ -19,5 +19,4 @@ interface BooleanClauseReader<BoolFilterBuilder, FilterBuilder> {
 
     boolean isMatchAllQuery(FilterBuilder filter);
 
-//    FilterBuilder newMatchAllQuery();
 }

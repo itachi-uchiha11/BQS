@@ -21,7 +21,7 @@ import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.springframework.util.ReflectionUtils;
 
-class EsBoolFilterHelper2 implements BooleanClauseReader<BoolQueryBuilder, QueryBuilder>, QueryBuilder2<BoolQueryBuilder, QueryBuilder>,
+class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBuilder>, QueryBuilder2<BoolQueryBuilder, QueryBuilder>,
         EqualsAndHashCodeSupplier<QueryBuilder>{
 
     private static final Field mustClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustClauses");
