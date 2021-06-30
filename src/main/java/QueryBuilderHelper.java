@@ -1,4 +1,4 @@
-interface QueryBuilder2<BoolFilter, Filter> {
+interface QueryBuilderHelper<BoolFilter, Filter> {
 
     Filter newMatchAllQuery();
 

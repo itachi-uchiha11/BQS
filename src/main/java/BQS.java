@@ -1,24 +1,21 @@
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.queryparser.xml.ParserException;
 import org.elasticsearch.index.query.BoolQueryBuilder;
-import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.logicng.formulas.*;
 import org.logicng.transformations.simplification.AdvancedSimplifier;
 import org.logicng.transformations.simplification.DefaultRatingFunction;
 
-import java.io.IOException;
 import java.util.*;
 
 public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
     private final Class<BoolQueryBuilderT> clz;
     private final BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader;
-    private final QueryBuilder2<BoolQueryBuilderT, QueryBuilderT> queryBuilder;
+    private final QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder;
     private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
 //    private BooleanClauseReader<BoolQueryBuilder,FilterBuilder> clausereader;
 
     private BQS(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-               EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilder2<BoolQueryBuilderT, QueryBuilderT> queryBuilder){
+               EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder){
         this.clz = clz;
         this.clauseReader = clauseReader;
         this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
