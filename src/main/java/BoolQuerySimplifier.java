@@ -7,15 +7,15 @@ import org.logicng.transformations.simplification.DefaultRatingFunction;
 
 import java.util.*;
 
-public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
+public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
     private final Class<BoolQueryBuilderT> clz;
     private final BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader;
     private final QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder;
     private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
 //    private BooleanClauseReader<BoolQueryBuilder,FilterBuilder> clausereader;
 
-    private BQS(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-               EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder){
+    private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder){
         this.clz = clz;
         this.clauseReader = clauseReader;
         this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
@@ -23,7 +23,7 @@ public class BQS<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
     }
     public static QueryBuilder optimize_boolquerybuilder(BoolQueryBuilder boolquerybuilder){
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
-        return new BQS<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper).optimize(boolquerybuilder);
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper).optimize(boolquerybuilder);
     }
     private QueryBuilderT optimize(BoolQueryBuilderT boolQueryBuilder){
         State<QueryBuilderT> state = new State<>(equalsAndHashCodeSupplier);
