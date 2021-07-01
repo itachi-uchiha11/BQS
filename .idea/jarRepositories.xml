@@ -16,5 +16,10 @@
       <option name="name" value="JBoss Community repository" />
       <option name="url" value="https://repository.jboss.org/nexus/content/repositories/public/" />
     </remote-repository>
+    <remote-repository>
+      <option name="id" value="es-snapshots" />
+      <option name="name" value="elasticsearch snapshot repo" />
+      <option name="url" value="https://snapshots.elastic.co/maven/" />
+    </remote-repository>
   </component>
 </project>
