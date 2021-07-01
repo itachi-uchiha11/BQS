@@ -23,7 +23,7 @@ public class Main {
         unopt.should(new BoolQueryBuilder().mustNot(temp2).mustNot(temp5));
         String x = unopt.toString();
         System.out.println(x);
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt,new DefaultRatingFunction());
+        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
         String x2 = opt.toString();
         System.out.println(x2);
 

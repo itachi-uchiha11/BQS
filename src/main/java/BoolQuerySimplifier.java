@@ -4,6 +4,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.logicng.formulas.*;
 import org.logicng.transformations.simplification.AdvancedSimplifier;
 import org.logicng.transformations.simplification.DefaultRatingFunction;
+import org.logicng.transformations.simplification.RatingFunction;
 
 import java.util.*;
 
@@ -12,25 +13,25 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
     private final BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader;
     private final QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder;
     private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
-    private final DefaultRatingFunction defaultRatingFunction;
+    private final RatingFunction<Integer> ratingFunction;
 //    private BooleanClauseReader<BoolQueryBuilder,FilterBuilder> clausereader;
 
     private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder,DefaultRatingFunction defaultRatingFunction){
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder,RatingFunction ratingFunction){
         this.clz = clz;
         this.clauseReader = clauseReader;
         this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
         this.queryBuilder = queryBuilder;
-        this.defaultRatingFunction = defaultRatingFunction;
+        this.ratingFunction = ratingFunction;
     }
     public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder){
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
         DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
         return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper,defaultRatingFunction).optimize(boolquerybuilder);
     }
-    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder,DefaultRatingFunction defaultRatingFunction){
+    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder,RatingFunction<Integer> ratingFunction){
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
-        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper,defaultRatingFunction).optimize(boolquerybuilder);
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper,ratingFunction).optimize(boolquerybuilder);
     }
     private QueryBuilderT optimize(BoolQueryBuilderT boolQueryBuilder){
         State<QueryBuilderT> state = new State<>(equalsAndHashCodeSupplier);
@@ -77,7 +78,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
     }
     private Formula simplifyFormula(Formula formula){
 //        DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
-        AdvancedSimplifier advancedSimplifier = new AdvancedSimplifier(defaultRatingFunction);
+        AdvancedSimplifier advancedSimplifier = new AdvancedSimplifier(ratingFunction);
         Formula simplified_formula = advancedSimplifier.apply(formula,false);
         return simplified_formula;
     }
