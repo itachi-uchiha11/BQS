@@ -17,7 +17,7 @@ public class Main {
         unopt.should(new BoolQueryBuilder().must(temp2).must(temp5));
         String x = unopt.toString();
         System.out.println(x);
-        QueryBuilder opt = BoolQuerySimplifier.optimize_boolquerybuilder(unopt);
+        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
         String x2 = opt.toString();
         System.out.println(x2);
     }
