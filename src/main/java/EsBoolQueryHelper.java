@@ -16,14 +16,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     private static final Field mustClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustClauses");
     private static final Field shouldClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "shouldClauses");
     private static final Field mustNotClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustNotClauses");
-    private static final boolean initialized = (mustClauses != null && shouldClauses != null && mustNotClauses != null);
 
     static {
-        if (initialized) {
             mustClauses.setAccessible(true);
             shouldClauses.setAccessible(true);
             mustNotClauses.setAccessible(true);
-        }
     }
 
     private final IdentityHashMap<QueryBuilder, Integer> queryHashCodeMap = new IdentityHashMap<>();
@@ -33,15 +30,15 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     @Override
     public Map<BooleanClauseType, List<QueryBuilder>> getAllClauses(BoolQueryBuilder boolQueryBuilder) {
         Map<BooleanClauseType, List<QueryBuilder>> result = new HashMap<>();
-        List<QueryBuilder> clauses = getConjunctionFilterBuilders(boolQueryBuilder);
+        List<QueryBuilder> clauses = getConjunctionQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.MUST, clauses);
         }
-        clauses = getDisjunctionFilterBuilders(boolQueryBuilder);
+        clauses = getDisjunctionQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.SHOULD, clauses);
         }
-        clauses = getNegativeFilterBuilders(boolQueryBuilder);
+        clauses = getNegativeQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.MUST_NOT, clauses);
         }
@@ -53,11 +50,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     public List<QueryBuilder> getClauses(BoolQueryBuilder boolQueryBuilder, BooleanClauseType clauseType) {
         switch (clauseType) {
             case MUST:
-                return getConjunctionFilterBuilders(boolQueryBuilder);
+                return getConjunctionQueryBuilders(boolQueryBuilder);
             case SHOULD:
-                return getDisjunctionFilterBuilders(boolQueryBuilder);
+                return getDisjunctionQueryBuilders(boolQueryBuilder);
             case MUST_NOT:
-                return getNegativeFilterBuilders(boolQueryBuilder);
+                return getNegativeQueryBuilders(boolQueryBuilder);
         }
         throw new UnsupportedOperationException("Unsupported type : " + clauseType);
     }
@@ -111,17 +108,17 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         });
     }
 
-    private static List<QueryBuilder> getDisjunctionFilterBuilders(BoolQueryBuilder boolQueryBuilder) {
+    private static List<QueryBuilder> getDisjunctionQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
         //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(shouldClauses, boolQueryBuilder);
     }
 
-    private static List<QueryBuilder> getConjunctionFilterBuilders(BoolQueryBuilder boolQueryBuilder) {
+    private static List<QueryBuilder> getConjunctionQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
         //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(mustClauses, boolQueryBuilder);
     }
 
-    private static List<QueryBuilder> getNegativeFilterBuilders(BoolQueryBuilder boolQueryBuilder) {
+    private static List<QueryBuilder> getNegativeQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
         //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(mustNotClauses, boolQueryBuilder);
     }

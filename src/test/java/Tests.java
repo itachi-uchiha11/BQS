@@ -1,22 +1,6 @@
-import org.apache.http.HttpHost;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.index.query.*;
 import org.junit.jupiter.api.*;
-import org.apache.http.HttpHost;
-import org.apache.lucene.queryparser.xml.ParserException;
-import org.elasticsearch.action.admin.indices.cache.clear.ClearIndicesCacheRequest;
-import org.elasticsearch.action.admin.indices.cache.clear.ClearIndicesCacheResponse;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.client.indices.GetIndexRequest;
-import org.elasticsearch.client.indices.GetIndexResponse;
 import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.search.builder.SearchSourceBuilder;
-import java.io.IOException;
 
 public class Tests {
     @Test
@@ -40,6 +24,7 @@ public class Tests {
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
+        System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
 
@@ -52,6 +37,7 @@ public class Tests {
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
+        System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
 
@@ -80,6 +66,7 @@ public class Tests {
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
+        System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
     @Test
@@ -105,16 +92,18 @@ public class Tests {
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
+        System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
     @Test
     void Test5(){
-        BoolQueryBuilder unopt = new BoolQueryBuilder().must(new BoolQueryBuilder().must(new MatchQueryBuilder("a","India")));
-        QueryBuilder target = new MatchQueryBuilder("a","India");
+        BoolQueryBuilder unopt = new BoolQueryBuilder().must(new BoolQueryBuilder().must(new MatchQueryBuilder("a","India")).mustNot(new MatchQueryBuilder("a","India")));
+        QueryBuilder target = new BoolQueryBuilder().mustNot(new MatchAllQueryBuilder());
         QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
+        System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
 
