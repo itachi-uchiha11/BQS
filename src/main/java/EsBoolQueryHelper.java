@@ -17,6 +17,7 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     private static final Field shouldClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "shouldClauses");
     private static final Field mustNotClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustNotClauses");
 
+    //static block to set field accessible
     static {
             mustClauses.setAccessible(true);
             shouldClauses.setAccessible(true);
@@ -28,26 +29,34 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
 
 
     @Override
+    //returns all member clauses grouped by ClauseType
     public Map<BooleanClauseType, List<QueryBuilder>> getAllClauses(BoolQueryBuilder boolQueryBuilder) {
+
         Map<BooleanClauseType, List<QueryBuilder>> result = new HashMap<>();
+
         List<QueryBuilder> clauses = getConjunctionQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.MUST, clauses);
         }
+
         clauses = getDisjunctionQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.SHOULD, clauses);
         }
+
         clauses = getNegativeQueryBuilders(boolQueryBuilder);
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             result.put(BooleanClauseType.MUST_NOT, clauses);
         }
+
         return result;
     }
 
 
     @Override
+    //returns clauses of specific ClauseType
     public List<QueryBuilder> getClauses(BoolQueryBuilder boolQueryBuilder, BooleanClauseType clauseType) {
+
         switch (clauseType) {
             case MUST:
                 return getConjunctionQueryBuilders(boolQueryBuilder);
@@ -56,26 +65,32 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
             case MUST_NOT:
                 return getNegativeQueryBuilders(boolQueryBuilder);
         }
+
         throw new UnsupportedOperationException("Unsupported type : " + clauseType);
     }
 
     @Override
+    //QueryBuilder corresponding to True boolean expression
     public QueryBuilder newMatchAllQuery() {
         return new MatchAllQueryBuilder();
     }
 
     @Override
+    //QueryBuilder corresponding to False boolean expression
     public QueryBuilder newMatchNoneQuery() {
         return new BoolQueryBuilder().mustNot(new MatchAllQueryBuilder());
     }
 
     @Override
+    //returns new BoolQueryBuilder object
     public BoolQueryBuilder newBoolQuery() {
         return new BoolQueryBuilder();
     }
 
     @Override
+    //adds clauses in specified ClauseType field
     public void addClause(BoolQueryBuilder boolQueryBuilder, BooleanClauseType clauseType, QueryBuilder queryBuilder) {
+
         switch (clauseType) {
             case MUST:
                 boolQueryBuilder.must(queryBuilder);
@@ -87,6 +102,7 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
                 boolQueryBuilder.mustNot(queryBuilder);
                 break;
         }
+
     }
 
     @Override
@@ -108,18 +124,18 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         });
     }
 
+    //returns list of Should member clauses
     private static List<QueryBuilder> getDisjunctionQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
-        //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(shouldClauses, boolQueryBuilder);
     }
 
+    //returns list of Must member clauses
     private static List<QueryBuilder> getConjunctionQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
-        //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(mustClauses, boolQueryBuilder);
     }
 
+    //returns list of MustNot member clauses
     private static List<QueryBuilder> getNegativeQueryBuilders(BoolQueryBuilder boolQueryBuilder) {
-        //noinspection unchecked
         return (List<QueryBuilder>) ReflectionUtils.getField(mustNotClauses, boolQueryBuilder);
     }
 
