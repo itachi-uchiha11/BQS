@@ -1,27 +1,35 @@
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.Map.Entry;
 import java.util.function.Function;
+import java.util.stream.StreamSupport;
+
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.springframework.util.ReflectionUtils;
 
 class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBuilder>, QueryBuilderHelper<BoolQueryBuilder, QueryBuilder>,
-        EqualsAndHashCodeSupplier<QueryBuilder>{
+        EqualsAndHashCodeSupplier<QueryBuilder>, LeafQueryHelper<QueryBuilder>{
 
     private static final Field mustClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustClauses");
     private static final Field shouldClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "shouldClauses");
     private static final Field mustNotClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustNotClauses");
+    private static final Field termName = ReflectionUtils.findField(TermQueryBuilder.class, "name");
+    private static final Field termValue = ReflectionUtils.findField(TermQueryBuilder.class, "value");
+    private static final Field termsName = ReflectionUtils.findField(TermsQueryBuilder.class, "name");
+    private static final Field termsValue = ReflectionUtils.findField(TermsQueryBuilder.class, "values");
+
 
     //static block to set field accessible
     static {
-            mustClauses.setAccessible(true);
-            shouldClauses.setAccessible(true);
-            mustNotClauses.setAccessible(true);
+        mustClauses.setAccessible(true);
+        shouldClauses.setAccessible(true);
+        mustNotClauses.setAccessible(true);
+        termName.setAccessible(true);
+        termValue.setAccessible(true);
+        termsName.setAccessible(true);
+        termsValue.setAccessible(true);
     }
 
     private final IdentityHashMap<QueryBuilder, Integer> queryHashCodeMap = new IdentityHashMap<>();
@@ -67,6 +75,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         }
 
         throw new UnsupportedOperationException("Unsupported type : " + clauseType);
+    }
+
+    @Override
+    public boolean isLeafClause(QueryBuilder clause) {
+        return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder);
     }
 
     @Override
@@ -139,4 +152,109 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         return (List<QueryBuilder>) ReflectionUtils.getField(mustNotClauses, boolQueryBuilder);
     }
 
+    private boolean reduceTermsQueryBuilder(QueryBuilder queryBuilder,Type type,Map<String,Set<Object>> fieldAndValues){
+        String name = ReflectionUtils.getField(termsName,queryBuilder).toString();
+        Object value = ReflectionUtils.getField(termsValue,queryBuilder);
+        Set<Object>values = fieldAndValues.get(name);
+        Set<Object>filteredValues = new HashSet<>();
+        if(value == null){
+            return false;
+        }
+        if(value.getClass().isArray()){
+            if(value instanceof int[]){
+                Arrays.stream((int[]) value).forEach(filteredValues::add);
+            }
+            else if(value instanceof double[]){
+                Arrays.stream((double[]) value).forEach(filteredValues::add);
+            }
+            else if(value instanceof long[]){
+                Arrays.stream((long[]) value).forEach(filteredValues::add);
+            }
+            else if(value instanceof float[]){
+                for(float f:(float [])value){
+                    filteredValues.add(f);
+                }
+            }
+            else {
+                filteredValues.addAll(Arrays.asList((Object[]) value));
+            }
+        }
+        else if(value instanceof Collection){
+            filteredValues.addAll((Collection<?>) value);
+        }
+        else if(value instanceof Iterable){
+            Iterable<?> iterable = (Iterable<?>) value;
+            StreamSupport.stream(iterable.spliterator(), false).forEach(filteredValues::add);
+        }
+        else{
+            return false;
+        }
+
+        if(values == null){
+            values = new HashSet<>(filteredValues);
+            fieldAndValues.put(name,values);
+        }
+        else{
+            switch(type){
+                case AND:{
+                    //dsabled
+                    break;
+                }
+                case OR:{
+                    values.addAll(filteredValues);
+                    break;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void reduceTermQueryBuilder(QueryBuilder queryBuilder,Type type,Map<String,Set<Object>> fieldAndValues){
+        String name = ReflectionUtils.getField(termName,queryBuilder).toString();
+        Object value = ReflectionUtils.getField(termValue,queryBuilder);
+        Set<Object>values = fieldAndValues.get(name);
+        if(values == null){
+            values = new HashSet<>();
+            values.add(value);
+            fieldAndValues.put(name,values);
+        }
+        else{
+            switch(type){
+                case AND:{
+                    //dsabled
+                    break;
+                }
+                case OR:{
+                    values.add(value);
+                    break;
+                }
+            }
+        }
+    }
+
+    @Override
+    public List<QueryBuilder> reduce(List<QueryBuilder> leafClauses, Type type) {
+        Map<String, Set<Object>>fieldAndValues = new HashMap<>();
+        List<QueryBuilder> reducedBuilders = new ArrayList<>();
+        for(QueryBuilder leaf : leafClauses){
+            if(leaf instanceof TermQueryBuilder){
+                reduceTermQueryBuilder(leaf,type,fieldAndValues);
+            }
+            else if(leaf instanceof TermsQueryBuilder && reduceTermsQueryBuilder(leaf,type,fieldAndValues)){
+
+            }
+            else{
+                reducedBuilders.add(leaf);
+            }
+        }
+        for(Entry<String,Set<Object>> entry : fieldAndValues.entrySet()){
+            if(SprinklrCollectionUtils.isEmpty(entry.getValue())){
+                reducedBuilders.add(0,newMatchNoneQuery());
+            }
+            else{
+                reducedBuilders.add(new TermsQueryBuilder(entry.getKey(),entry.getValue()));
+            }
+        }
+        return  reducedBuilders;
+    }
 }
