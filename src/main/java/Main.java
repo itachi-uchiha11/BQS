@@ -7,6 +7,7 @@ import org.apache.http.nio.protocol.HttpAsyncResponseConsumer;
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequestBuilder;
 import org.elasticsearch.action.admin.indices.get.GetIndexResponse;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.IndicesAdminClient;
 import org.elasticsearch.client.rest.RestClient;
 import org.elasticsearch.common.jackson.dataformat.yaml.snakeyaml.parser.ParserException;
@@ -16,6 +17,7 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.logicng.transformations.simplification.DefaultRatingFunction;
 
 import java.io.IOException;
@@ -44,15 +46,17 @@ public class Main {
                 .setConnectTimeout(TimeValue.timeValueMillis(60000))
                 .setConnectionRequestTimeout(TimeValue.timeValueMillis(60000))
                 .setMaxResponseSize(new ByteSizeValue(1, ByteSizeUnit.GB))
-                .setMaxConnectionsPerRoute(10000).setMaxConnectionsTotal(20000)
+                .setMaxConnectionsPerRoute(20000).setMaxConnectionsTotal(30000)
                 .connectionLiveTimeInPool(TimeValue.timeValueMillis(60000)).build();
-        String clusterName = builder.getClusterName();
-        IndicesAdminClient indices = builder.admin().indices();
-        GetIndexRequestBuilder getIndexRequestBuilder = indices.prepareGetIndex().addIndices("*");
-        ActionFuture<GetIndexResponse> index = indices.getIndex(getIndexRequestBuilder.request());
-        String[] indices1 = index.get().indices();
-        for(String x :indices1){System.out.println(x);}
-        System.out.println(clusterName);
+//        String clusterName = builder.getClusterName();
+//        IndicesAdminClient indices = builder.admin().indices();
+//        GetIndexRequestBuilder getIndexRequestBuilder = indices.prepareGetIndex().addIndices("*");
+//        ActionFuture<GetIndexResponse> index = indices.getIndex(getIndexRequestBuilder.request());
+//        String[] indices1 = index.get().indices();
+//        for(String x :indices1){System.out.println(x);}
+//        System.out.println(clusterName);
+        System.out.println(builder.prepareSearch("mynetflix").execute().actionGet());
+//        System.out.println(searchResponse);
         builder.close();
     }
 }

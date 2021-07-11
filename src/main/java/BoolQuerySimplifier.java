@@ -4,6 +4,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.logicng.formulas.*;
 import java.util.Map.Entry;
 import org.logicng.transformations.simplification.AdvancedSimplifier;
+import org.logicng.transformations.simplification.BackboneSimplifier;
 import org.logicng.transformations.simplification.DefaultRatingFunction;
 import org.logicng.transformations.simplification.RatingFunction;
 
@@ -54,7 +55,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
         State<QueryBuilderT> state = new State<>(equalsAndHashCodeSupplier);
         Formula optimized = convertToFormula(boolQueryBuilder,state);
-
+//        System.out.println(optimized);
         return convertToQuery(optimized,state);
     }
 
@@ -65,21 +66,23 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
         Map<BooleanClauseType,List<QueryBuilderT>>allclauses = clauseReader.getAllClauses(boolQueryBuilder);
         List<Formula> formulas = new ArrayList<>();
         List<QueryBuilderT> clauses = allclauses.get(BooleanClauseType.MUST);
-
+//        System.out.println("got must");
         if(SprinklrCollectionUtils.isNotEmpty(clauses)){
             List<Formula> mustFormulae = addClauses(clauses,state);
             Formula formula = simplifyFormula(state.formulaFactory.and(mustFormulae));
             formulas.add(formula);
         }
         clauses = allclauses.get(BooleanClauseType.SHOULD);
-
+//        System.out.println("got should");
         if(SprinklrCollectionUtils.isNotEmpty(clauses)){
             List<Formula> shouldFormulae = addClauses(clauses,state);
+//            System.out.println("got should formulas");
             Formula formula = simplifyFormula(state.formulaFactory.or(shouldFormulae));
+//            System.out.println("got optimized should formula");
             formulas.add(formula);
         }
         clauses = allclauses.get(BooleanClauseType.MUST_NOT);
-
+//        System.out.println("got must_not");
         if(SprinklrCollectionUtils.isNotEmpty(clauses)){
             List<Formula> mustNotFormulae = addClauses(clauses,state);
             Formula formula = simplifyFormula(state.formulaFactory.not(state.formulaFactory.or(mustNotFormulae)));
@@ -93,7 +96,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
     //from List of QueryBuilder objects
     private List<Formula> addClauses(List<QueryBuilderT> clauses,State state){
         List<Formula> formulas = new ArrayList<>();
-
+//        System.out.println("registering");
         for(QueryBuilderT clause : clauses){
             if(clz.isAssignableFrom(clause.getClass())){
                 //checks for recursive bool query
@@ -104,6 +107,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
                 formulas.add(state.getVariable(clause));
             }
         }
+//        System.out.println("ended listing");
 
         return formulas;
     }
@@ -112,9 +116,12 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
     // using AdvancedSimplifier object
     private Formula simplifyFormula(Formula formula){
 
-        AdvancedSimplifier advancedSimplifier = new AdvancedSimplifier(ratingFunction);
+        BackboneSimplifier advancedSimplifier = new BackboneSimplifier();
+//        System.out.println("before simplifiecation");
+//        System.out.println(formula.literals().size());
         Formula simplified_formula = advancedSimplifier.apply(formula,false);
-
+//        System.out.println(simplified_formula.toString());
+//        System.out.println("applied simplifiecation");
         return simplified_formula;
     }
 

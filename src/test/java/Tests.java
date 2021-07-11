@@ -106,5 +106,29 @@ public class Tests {
         System.out.println(x1+x3);
         Assertions.assertEquals(x2,x3);
     }
+    @Test
+    void Test6() {
+        BoolQueryBuilder unopt = new BoolQueryBuilder();
+        TermQueryBuilder temp2 = new TermQueryBuilder("a","India");
+        TermQueryBuilder temp3 = new TermQueryBuilder("b",1);
+        TermQueryBuilder temp4 = new TermQueryBuilder("b",2);
+        TermQueryBuilder temp5 = new TermQueryBuilder("c",3);
+        unopt.should(new BoolQueryBuilder().must(temp2).must(temp3));
+        unopt.should(new BoolQueryBuilder().must(temp2).must(temp4));
+        unopt.should(new BoolQueryBuilder().must(temp2).must(temp5));
+        BoolQueryBuilder target = new BoolQueryBuilder();
+        target.must(temp2);
+        BoolQueryBuilder temp = new BoolQueryBuilder();
+        temp.should(temp3);
+        temp.should(temp4);
+        temp.should(temp5);
+        target.must(temp);
+        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        String x1 = unopt.toString();
+        String x2 = opt.toString();
+        String x3 = target.toString();
+        System.out.println(x1+x3);
+        Assertions.assertEquals(x2,x3);
+    }
 
 }

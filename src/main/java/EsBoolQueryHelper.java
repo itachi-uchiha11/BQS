@@ -251,6 +251,9 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
             if(SprinklrCollectionUtils.isEmpty(entry.getValue())){
                 reducedBuilders.add(0,newMatchNoneQuery());
             }
+            else if(entry.getValue().size()==1){
+                reducedBuilders.add(new TermQueryBuilder(entry.getKey(),entry.getValue().toArray()[0]));
+            }
             else{
                 reducedBuilders.add(new TermsQueryBuilder(entry.getKey(),entry.getValue()));
             }
