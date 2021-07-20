@@ -22,13 +22,32 @@ public class JsonConverter {
     static public List<Integer> unoptSize = new ArrayList<>();
     static public List<Integer> optSize = new ArrayList<>();
     static public long optTime = 0L;
-    static public boolean toBeAnalysed = false;
+    static public boolean toBeAnalysed = true;
     static public int varno = 0;
     static public int extra_size = 0;
-    static public boolean unoptimized = false;
+    static public boolean returnUnoptimized = false;
     static public boolean addTime = true;
+    private final String[] queries = {"prefix","range","term","terms","wildcard","exists","spr_query_string","query_string","match_all","match","geo_shape"};
 
+    private GeoShapeQueryBuilder getGeoShapeBuilder(Object[] s, JSONObject jsonObject) {
+        for (Object xx : s) {
+            String x = (String) xx;
+            if (x.equals("_name")) {
 
+            } else {
+                JSONObject jsonObject1 = (JSONObject) jsonObject.get(x);
+                String rad = (String) ((JSONObject) (jsonObject1).get("shape")).get("radius");
+                JSONArray coord = (JSONArray) ((JSONObject) (jsonObject1).get("shape")).get("coordinates");
+                double lat = (double) coord.get(0);
+                double lon = (double) coord.get(1);
+                GeoShapeQueryBuilder geoShapeQueryBuilder = new GeoShapeQueryBuilder(x, ShapeBuilder.newCircleBuilder().center(lat, lon).radius(rad)).queryName(null);
+                return geoShapeQueryBuilder;
+            }
+        }
+        return null;
+    }
+
+    // Query Builder corresponding to Term Level Queries
     private QueryBuilder getSingleQueryBuilder(JSONObject jsonObject) {
         Object[] s = jsonObject.keySet().toArray();
         String x = (String) s[0];
@@ -101,30 +120,13 @@ public class JsonConverter {
                 return QueryBuilders.matchQuery(x2, x3);
             }
             case "geo_shape": {
-                return getShapeBuilder(s2, jsonObject1);
+                return getGeoShapeBuilder(s2, jsonObject1);
             }
         }
         throw new UnsupportedOperationException(x + " is not supported in QueryBuilders");
     }
 
-    private GeoShapeQueryBuilder getShapeBuilder(Object[] s, JSONObject jsonObject) {
-        for (Object xx : s) {
-            String x = (String) xx;
-            if (x.equals("_name")) {
-
-            } else {
-                JSONObject jsonObject1 = (JSONObject) jsonObject.get(x);
-                String rad = (String) ((JSONObject) (jsonObject1).get("shape")).get("radius");
-                JSONArray coord = (JSONArray) ((JSONObject) (jsonObject1).get("shape")).get("coordinates");
-                double lat = (double) coord.get(0);
-                double lon = (double) coord.get(1);
-                GeoShapeQueryBuilder geoShapeQueryBuilder = new GeoShapeQueryBuilder(x, ShapeBuilder.newCircleBuilder().center(lat, lon).radius(rad)).queryName(null);
-                return geoShapeQueryBuilder;
-            }
-        }
-        return null;
-    }
-
+    // returns List of QueryBuilder objects corresponding to its member clauses
     private ArrayList<QueryBuilder> getQueryBuilders(Object obj, String tt) {
         ArrayList<QueryBuilder> lst = new ArrayList<>();
         if (obj.getClass() == jobj.getClass()) {
@@ -175,6 +177,8 @@ public class JsonConverter {
         return boolQueryBuilder;
     }
 
+    // resolves Placeholder QueryBuilders into
+    // their respective Json format Query Syntax
     private JSONObject resolveJSONObject(JSONObject j) {
         JSONObject newj = new JSONObject();
         String string = "miscellaneous_";
@@ -236,6 +240,7 @@ public class JsonConverter {
         return newj;
     }
 
+    // Converts QueryBuilder object to Json format
     private JSONObject getJsonObject(QueryBuilder queryBuilder) {
         String x = queryBuilder.toString();
         try {
@@ -253,9 +258,12 @@ public class JsonConverter {
         BoolQueryBuilder boolQueryBuilder = getBoolQueryBuilder(jsonObject);
         long l1 = getJsonObject(boolQueryBuilder).toString().length();
         QueryBuilder queryBuilder;
-        if (unoptimized) {
+        // returns uncached-unoptimized query
+        if (returnUnoptimized) {
             queryBuilder = boolQueryBuilder;
-        } else {
+        }
+        // returns optimized query
+        else {
             long start = System.nanoTime();
             queryBuilder = BoolQuerySimplifier.optimizeBoolQueryBuilder(boolQueryBuilder);
             long end = System.nanoTime();
@@ -268,6 +276,9 @@ public class JsonConverter {
         return getJsonObject(queryBuilder);
     }
 
+    // main converter function
+    // Unoptimized Json -> Unoptimized-uncached/Optimized Json
+    // depending on value of unoptimized flag
     private JSONObject converter2(JSONObject obj) {
         JSONObject jsonObject = new JSONObject();
         Set<String> set = obj.keySet();
@@ -325,169 +336,59 @@ public class JsonConverter {
         }
     }
 
-    private void print(int a, int b, int c, int d, int e, int f, int g, int h, int i, String o) {
-        if (a != 0) {
-            System.out.print(o + "prefix : ");
-            System.out.println(a);
-        }
-        if (b != 0) {
-            System.out.print(o + "range : ");
-            System.out.println(b);
-        }
-        if (c != 0) {
-            System.out.print(o + "term : ");
-            System.out.println(c);
-        }
-        if (d != 0) {
-            System.out.print(o + "terms : ");
-            System.out.println(d);
-        }
-        if (e != 0) {
-            System.out.print(o + "exists/wildcard : ");
-            System.out.println(e);
-        }
-        if (f != 0) {
-            System.out.print(o + "spr_query_string/queryString : ");
-            System.out.println(f);
-        }
-        if (g != 0) {
-            System.out.print(o + "match_all : ");
-            System.out.println(g);
-        }
-        if (h != 0) {
-            System.out.print(o + "match : ");
-            System.out.println(h);
-        }
-        if (i != 0) {
-            System.out.print(o + "geo_shape : ");
-            System.out.println(i);
-        }
-    }
-
     private void print(String a, String o) {
         System.out.print(o);
         System.out.println(a + " : ");
     }
 
     private void analyser2(Object o, String offset) {
+        Map<String,Integer> queryCountMap = new HashMap<>();
+        for(String x:queries){
+            queryCountMap.put(x,0);
+        }
         if (o instanceof JSONObject) {
             JSONObject jsonObject = (JSONObject) o;
             String x = (String) jsonObject.keySet().toArray()[0];
             if (x.equals("bool")) {
                 analyser(jsonObject, offset);
             } else {
-                int p = 0, r = 0, t = 0, ts = 0, ex = 0, sq = 0, ma = 0, mq = 0, gs = 0;
-                switch (x) {
-                    case "prefix": {
-                        p++;
-                        break;
-                    }
-                    case "range": {
-                        r++;
-                        break;
-                    }
-                    case "term": {
-                        t++;
-                        break;
-                    }
-                    case "terms": {
-                        ts++;
-                        break;
-                    }
-                    case "wildcard": {
-                    }
-                    case "exists": {
-                        ex++;
-                        break;
-                    }
-                    case "spr_query_string": {
-                    }
-                    case "query_string": {
-                        sq++;
-                        break;
-                    }
-                    case "match_all": {
-                        ma++;
-                        break;
-                    }
-                    case "match": {
-                        mq++;
-                        break;
-                    }
-                    case "geo_shape": {
-                        gs++;
-                        break;
-                    }
-                    default: {
-                        System.out.println(x + " is not suppported like term clause");
-                        throw new UnsupportedOperationException(x.getClass() + " is not supported");
-
-                    }
+                Integer count = queryCountMap.get(x);
+                if(count==null){
+                    System.out.println(x + " is not suppported");
+                    throw new UnsupportedOperationException(x.getClass() + " is not supported");
                 }
-                print(p, r, t, ts, ex, sq, ma, mq, gs, offset);
+                else{
+                    queryCountMap.put(x,count+1);
+                }
             }
         } else {
             JSONArray jsonArray = (JSONArray) o;
-            int p = 0, r = 0, t = 0, ts = 0, ex = 0, sq = 0, ma = 0, mq = 0, gs = 0;
             for (Object x : jsonArray) {
                 JSONObject jsonObject = (JSONObject) x;
                 String y = (String) jsonObject.keySet().toArray()[0];
                 if (y.equals("bool")) {
                     analyser(jsonObject, offset);
                 } else {
-                    switch (y) {
-                        case "prefix": {
-                            p++;
-                            break;
-                        }
-                        case "range": {
-                            r++;
-                            break;
-                        }
-                        case "term": {
-                            t++;
-                            break;
-                        }
-                        case "terms": {
-                            ts++;
-                            break;
-                        }
-                        case "wildcard": {
-                        }
-                        case "exists": {
-                            ex++;
-                            break;
-                        }
-                        case "spr_query_string": {
-                        }
-                        case "query_string": {
-                            sq++;
-                            break;
-                        }
-                        case "match_all": {
-                            ma++;
-                            break;
-                        }
-                        case "match": {
-                            mq++;
-                            break;
-                        }
-                        case "geo_shape": {
-                            gs++;
-                            break;
-                        }
-                        default: {
-                            System.out.println(y + " is not suppported like term clause");
-                            throw new UnsupportedOperationException(y.getClass() + " is not supported");
-
-                        }
+                    Integer count = queryCountMap.get(y);
+                    if(count==null){
+                        System.out.println(x + " is not suppported");
+                        throw new UnsupportedOperationException(x.getClass() + " is not supported");
+                    }
+                    else{
+                        queryCountMap.put(y,count+1);
                     }
                 }
             }
-            print(p, r, t, ts, ex, sq, ma, mq, gs, offset);
+        }
+        for(Map.Entry<String,Integer>entry : queryCountMap.entrySet()){
+            if(entry.getValue()!=0){
+                System.out.println(offset+entry.getKey()+" : "+entry.getValue());
+            }
         }
     }
 
+    // Prints Tree structure of Bool Query
+    // Useful for debugging and visualizing optimization
     private void analyser(JSONObject jsonObject, String offset) {
         for (Object objj : jsonObject.keySet().toArray()) {
             String obj = (String) objj;
@@ -519,7 +420,8 @@ public class JsonConverter {
         }
     }
 
-
+    // Optimized and Unoptimized-uncached queries are written into Files Directory
+    // Optimization Stats are writtten in OptimizeQueryLog in Files Directory
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException, ParseException {
         String[] unOptQueries = {"demo"};
         FileWriter fw22 = null;
@@ -558,10 +460,10 @@ public class JsonConverter {
             }
             try {
                 fw2 = new FileWriter("src/main/Files/" + x + "-1");
-                unoptimized = true;
+                returnUnoptimized = true;
                 addTime = false;
                 JSONObject jsonObject1 = (JSONObject) jsonConverter.converter(obj2);
-                unoptimized = false;
+                returnUnoptimized = false;
                 addTime = true;
                 fw2.write(jsonObject1.toString());
                 fw2.close();

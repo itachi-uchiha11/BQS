@@ -18,50 +18,45 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryB
     private final QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder;
     private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
     private final LeafQueryHelper<QueryBuilderT> leafQueryHelper;
-    private final RatingFunction<Integer> ratingFunction;
+//    private final RatingFunction<Integer> ratingFunction;
     private final BackboneSimplifier backboneSimplifier = new BackboneSimplifier();
     private final FactorOutSimplifier factorOutSimplifier = new FactorOutSimplifier();
     private final NegationSimplifier negationSimplifier = new NegationSimplifier();
-    private boolean useAdvancedSimplifier = false;
     private boolean prefixOn = false;
 
     private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, RatingFunction ratingFunction, LeafQueryHelper<QueryBuilderT> leafQueryHelper, boolean prefixOn) {
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, LeafQueryHelper<QueryBuilderT> leafQueryHelper, boolean prefixOn) {
 
         this.clz = clz;
         this.clauseReader = clauseReader;
         this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
         this.queryBuilder = queryBuilder;
-        this.ratingFunction = ratingFunction;
         this.leafQueryHelper = leafQueryHelper;
         this.prefixOn = prefixOn;
 
     }
 
     private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, RatingFunction ratingFunction, LeafQueryHelper<QueryBuilderT> leafQueryHelper) {
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, LeafQueryHelper<QueryBuilderT> leafQueryHelper) {
 
         this.clz = clz;
         this.clauseReader = clauseReader;
         this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
         this.queryBuilder = queryBuilder;
-        this.ratingFunction = ratingFunction;
         this.leafQueryHelper = leafQueryHelper;
 
     }
 
     // 2 different static factory methods
-    // based on whether user provides RatingFunction or not
+    // based on whether user wants to enable Prefix Query Optimization
     public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder, boolean prefixOn) {
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
-        DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
-        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, defaultRatingFunction, esBoolQueryHelper, prefixOn).optimize(boolquerybuilder);
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, prefixOn).optimize(boolquerybuilder);
     }
 
     public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder) {
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
-        DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
-        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, defaultRatingFunction, esBoolQueryHelper).optimize(boolquerybuilder);
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper).optimize(boolquerybuilder);
     }
 
     //Instantiates a new State object
@@ -84,12 +79,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryB
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             List<Formula> mustFormulae = addClauses(clauses, state);
             Formula formula;
-//            if(mustFormulae.size()==1){
-//                formula = mustFormulae.get(0);
-//            }
-//            else {
             formula = simplifyFormula(state.formulaFactory.and(mustFormulae));
-//            }
             formulas.add(formula);
         }
 
@@ -97,12 +87,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryB
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             List<Formula> shouldFormulae = addClauses(clauses, state);
             Formula formula;
-//            if(shouldFormulae.size()==1){
-//                formula = shouldFormulae.get(0);
-//            }
-//            else {
             formula = simplifyFormula(state.formulaFactory.or(shouldFormulae));
-//            }
             formulas.add(formula);
         }
 
@@ -110,12 +95,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryB
         if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
             List<Formula> mustNotFormulae = addClauses(clauses, state);
             Formula formula;
-//            if(mustNotFormulae.size()==1){
-//                formula = mustNotFormulae.get(0);
-//            }
-//            else {
             formula = simplifyFormula(state.formulaFactory.not(state.formulaFactory.or(mustNotFormulae)));
-//            }
             formulas.add(formula);
         }
 
@@ -142,10 +122,6 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryB
     //simplifies Formula object into a reduced equivalent Formula object
     private Formula simplifyFormula(Formula formula) {
 
-        if (useAdvancedSimplifier) {
-            AdvancedSimplifier advancedSimplifier = new AdvancedSimplifier(ratingFunction);
-            return advancedSimplifier.apply(formula, false);
-        }
         formula = backboneSimplifier.apply(formula, false);
         formula = factorOutSimplifier.apply(formula, false);
         formula = negationSimplifier.apply(formula, false);
