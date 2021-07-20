@@ -1,4 +1,4 @@
-for y in $(seq 2 7); do
+for y in $(seq 1 8); do
 for x in _ a b; do
 for i in $(seq 1 1); do
   rm f$y$x-out.json

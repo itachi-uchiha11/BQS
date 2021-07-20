@@ -15,7 +15,7 @@ public class GetExecTime {
         return (long) jsonObject.get("total_exec_time");
     }
     private static void getTime(String file) throws IOException, ParseException {
-        BufferedReader in = new BufferedReader(new FileReader("src/main/java/" + file));
+        BufferedReader in = new BufferedReader(new FileReader("src/main/Curl Outputs/" + file));
         String line;
         long avgTime=0L;
         int counter=0;

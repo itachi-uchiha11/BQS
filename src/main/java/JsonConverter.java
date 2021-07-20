@@ -5,14 +5,10 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 
 public class JsonConverter {
@@ -33,7 +29,7 @@ public class JsonConverter {
     static public boolean addTime = true;
 
 
-    private static QueryBuilder getSingleQueryBuilder(JSONObject jsonObject) {
+    private QueryBuilder getSingleQueryBuilder(JSONObject jsonObject) {
         Object[] s = jsonObject.keySet().toArray();
         String x = (String) s[0];
         JSONObject jsonObject1 = (JSONObject) jsonObject.get(x);
@@ -51,16 +47,13 @@ public class JsonConverter {
         }
         switch (x) {
             case "prefix": {
-//                System.out.println(x2+"\n"+x3);
                 QueryBuilder queryBuilder = QueryBuilders.prefixQuery(x2, (String) x3);
-//                System.out.println(queryBuilder);
                 return queryBuilder;
             }
             case "term": {
                 return QueryBuilders.termQuery(x2, x3);
             }
             case "terms": {
-//                System.out.println(x3);
                 if (x3 instanceof JSONArray) {
                     return QueryBuilders.termsQuery(x2, (JSONArray) x3);
                 }
@@ -109,35 +102,30 @@ public class JsonConverter {
             }
             case "geo_shape": {
                 return getShapeBuilder(s2, jsonObject1);
-//                return QueryBuilders.geoShapeQuery("x2",getShapeBuilder(x3));
             }
         }
         throw new UnsupportedOperationException(x + " is not supported in QueryBuilders");
     }
 
-    private static GeoShapeQueryBuilder getShapeBuilder(Object[] s, JSONObject jsonObject) {
+    private GeoShapeQueryBuilder getShapeBuilder(Object[] s, JSONObject jsonObject) {
         for (Object xx : s) {
             String x = (String) xx;
             if (x.equals("_name")) {
 
             } else {
-//                System.out.println(x);
                 JSONObject jsonObject1 = (JSONObject) jsonObject.get(x);
-                String rad = (String) ((JSONObject) ((JSONObject) jsonObject.get(x)).get("shape")).get("radius");
-                JSONArray coord = (JSONArray) ((JSONObject) ((JSONObject) jsonObject.get(x)).get("shape")).get("coordinates");
-//                System.out.println(coord.getClass());
-//                throw new UnsupportedOperationException(coord + " is not supported in GEOQueryBuilders");
+                String rad = (String) ((JSONObject) (jsonObject1).get("shape")).get("radius");
+                JSONArray coord = (JSONArray) ((JSONObject) (jsonObject1).get("shape")).get("coordinates");
                 double lat = (double) coord.get(0);
                 double lon = (double) coord.get(1);
                 GeoShapeQueryBuilder geoShapeQueryBuilder = new GeoShapeQueryBuilder(x, ShapeBuilder.newCircleBuilder().center(lat, lon).radius(rad)).queryName(null);
-//                System.out.println(geoShapeQueryBuilder);
                 return geoShapeQueryBuilder;
             }
         }
         return null;
     }
 
-    private static ArrayList<QueryBuilder> getQueryBuilders(Object obj, String tt) {
+    private ArrayList<QueryBuilder> getQueryBuilders(Object obj, String tt) {
         ArrayList<QueryBuilder> lst = new ArrayList<>();
         if (obj.getClass() == jobj.getClass()) {
             lst.add(getSingleQueryBuilder((JSONObject) obj));
@@ -150,12 +138,11 @@ public class JsonConverter {
             extra_size += obj.toString().length();
 
             return null;
-//            throw new UnsupportedOperationException(obj.getClass() + " is not supported");
         }
         return lst;
     }
 
-    private static BoolQueryBuilder getBoolQueryBuilder(JSONObject jsonObject) {
+    private BoolQueryBuilder getBoolQueryBuilder(JSONObject jsonObject) {
         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
         for (Object x : jsonObject.keySet()) {
             ArrayList<QueryBuilder> lst = getQueryBuilders(jsonObject.get(x), (String) x);
@@ -188,7 +175,7 @@ public class JsonConverter {
         return boolQueryBuilder;
     }
 
-    private static JSONObject resolveMiscellaneousAndPrefix(JSONObject j) {
+    private JSONObject resolveJSONObject(JSONObject j) {
         JSONObject newj = new JSONObject();
         String string = "miscellaneous_";
         for (Object e : j.keySet().toArray()) {
@@ -206,19 +193,18 @@ public class JsonConverter {
                 newj.put("exists", tempjson);
             } else if (s.equals("terms")) {
                 String k = (String) (((JSONObject) j.get(s)).keySet().toArray()[0]);
-//                System.out.println(k);
                 if (k.length() >= string.length() && string.equals(k.substring(0, 14))) {
                     JSONObject jsonObject = (JSONObject) ((JSONArray) ((JSONObject) j.get(s)).get(k)).get(0);
                     newj.put("terms", jsonObject);
                 } else {
                     Object value = j.get(s);
                     if (value instanceof JSONObject) {
-                        newj.put(s, resolveMiscellaneousAndPrefix((JSONObject) value));
+                        newj.put(s, resolveJSONObject((JSONObject) value));
                     } else if (value instanceof JSONArray) {
                         JSONArray jsonArray = new JSONArray();
                         for (Object a : (JSONArray) value) {
                             if (a instanceof JSONObject) {
-                                jsonArray.add(resolveMiscellaneousAndPrefix((JSONObject) a));
+                                jsonArray.add(resolveJSONObject((JSONObject) a));
                             } else {
                                 jsonArray.add(a);
                             }
@@ -231,12 +217,12 @@ public class JsonConverter {
             } else {
                 Object value = j.get(s);
                 if (value instanceof JSONObject) {
-                    newj.put(s, resolveMiscellaneousAndPrefix((JSONObject) value));
+                    newj.put(s, resolveJSONObject((JSONObject) value));
                 } else if (value instanceof JSONArray) {
                     JSONArray jsonArray = new JSONArray();
                     for (Object a : (JSONArray) value) {
                         if (a instanceof JSONObject) {
-                            jsonArray.add(resolveMiscellaneousAndPrefix((JSONObject) a));
+                            jsonArray.add(resolveJSONObject((JSONObject) a));
                         } else {
                             jsonArray.add(a);
                         }
@@ -250,13 +236,11 @@ public class JsonConverter {
         return newj;
     }
 
-    private static JSONObject getJsonObject(QueryBuilder queryBuilder) {
+    private JSONObject getJsonObject(QueryBuilder queryBuilder) {
         String x = queryBuilder.toString();
-//        System.out.println(x);
         try {
             JSONObject jsonobj = (JSONObject) jsonParser.parse(x);
-            jsonobj = resolveMiscellaneousAndPrefix(jsonobj);
-//            System.out.println(jsonobj);
+            jsonobj = resolveJSONObject(jsonobj);
             return jsonobj;
         } catch (ParseException e) {
             System.out.println("Incorrect JSON formation");
@@ -265,7 +249,7 @@ public class JsonConverter {
         }
     }
 
-    private static JSONObject optimizedObj(JSONObject jsonObject) {
+    private JSONObject optimizedObj(JSONObject jsonObject) {
         BoolQueryBuilder boolQueryBuilder = getBoolQueryBuilder(jsonObject);
         long l1 = getJsonObject(boolQueryBuilder).toString().length();
         QueryBuilder queryBuilder;
@@ -275,7 +259,7 @@ public class JsonConverter {
             long start = System.nanoTime();
             queryBuilder = BoolQuerySimplifier.optimizeBoolQueryBuilder(boolQueryBuilder);
             long end = System.nanoTime();
-            if(addTime)optTime+=(end-start)/(1000*1000);
+            if (addTime) optTime += (end - start) / (1000 * 1000);
         }
         long l2 = getJsonObject(queryBuilder).toString().length();
         maxPercent.add(((double) (l1 - l2)) / (double) l1);
@@ -284,21 +268,18 @@ public class JsonConverter {
         return getJsonObject(queryBuilder);
     }
 
-    private static JSONObject converter2(JSONObject obj) {
+    private JSONObject converter2(JSONObject obj) {
         JSONObject jsonObject = new JSONObject();
         Set<String> set = obj.keySet();
         for (String x : set) {
             if (x.equals("bool")) {
                 JSONObject jobj = new JSONObject();
                 jobj.put(x, obj.get(x));
-//                System.out.println(jobj);
                 if (toBeAnalysed) {
-                    System.out.println("XXXXXX\nUnoptimized:");
+                    System.out.println("Start Analysis\nUnoptimized:");
                     analyser(jobj, "");
                 }
                 JSONObject optimizedObj = optimizedObj((JSONObject) obj.get(x));
-//                System.out.println(optimizedObj);
-//                jsonObject.put(x, optimizedObj.get(x));
                 JSONObject jobj2 = new JSONObject();
                 if (optimizedObj.get(x) != null) {
                     jobj2.put(x, optimizedObj.get(x));
@@ -312,10 +293,9 @@ public class JsonConverter {
                     x = (String) jobj2.keySet().toArray()[0];
                 }
                 if (toBeAnalysed) {
-                    System.out.println("XXXXXX");
+                    System.out.println("End Analysis");
                 }
                 jsonObject.put(x, jobj2.get(x));
-//                System.out.println(jsonObject);
             } else {
                 jsonObject.put(x, converter(obj.get(x)));
             }
@@ -323,7 +303,7 @@ public class JsonConverter {
         return jsonObject;
     }
 
-    private static JSONArray converter2(JSONArray obj) {
+    private JSONArray converter2(JSONArray obj) {
         JSONArray jsonArray = new JSONArray();
         for (Object x : obj) {
             if (x instanceof String) {
@@ -335,18 +315,17 @@ public class JsonConverter {
         return jsonArray;
     }
 
-    private static Object converter(Object obj) {
+    public Object converter(Object obj) {
         if (obj.getClass() == jobj.getClass()) {
             return converter2((JSONObject) obj);
         } else if (obj.getClass() == jarray.getClass()) {
             return converter2((JSONArray) obj);
         } else {
-            //System.out.println(obj.getClass() + " is not supported");
             return obj;
         }
     }
 
-    private static void print(int a, int b, int c, int d, int e, int f, int g, int h, int i, String o) {
+    private void print(int a, int b, int c, int d, int e, int f, int g, int h, int i, String o) {
         if (a != 0) {
             System.out.print(o + "prefix : ");
             System.out.println(a);
@@ -385,17 +364,14 @@ public class JsonConverter {
         }
     }
 
-    private static void print(String a, String o) {
+    private void print(String a, String o) {
         System.out.print(o);
         System.out.println(a + " : ");
     }
 
-    private static void analyser2(Object o, String offset) {
-
+    private void analyser2(Object o, String offset) {
         if (o instanceof JSONObject) {
-
             JSONObject jsonObject = (JSONObject) o;
-//            System.out.println(jsonObject.toString().length());
             String x = (String) jsonObject.keySet().toArray()[0];
             if (x.equals("bool")) {
                 analyser(jsonObject, offset);
@@ -411,12 +387,10 @@ public class JsonConverter {
                         break;
                     }
                     case "term": {
-//                        System.out.println("term : "+jsonObject.get(x));
                         t++;
                         break;
                     }
                     case "terms": {
-//                        System.out.println("terms : "+jsonObject.get(x));
                         ts++;
                         break;
                     }
@@ -454,7 +428,6 @@ public class JsonConverter {
             }
         } else {
             JSONArray jsonArray = (JSONArray) o;
-//            System.out.println(jsonArray.toString().length());
             int p = 0, r = 0, t = 0, ts = 0, ex = 0, sq = 0, ma = 0, mq = 0, gs = 0;
             for (Object x : jsonArray) {
                 JSONObject jsonObject = (JSONObject) x;
@@ -472,12 +445,10 @@ public class JsonConverter {
                             break;
                         }
                         case "term": {
-//                            System.out.println("term : "+jsonObject.get(y));
                             t++;
                             break;
                         }
                         case "terms": {
-//                            System.out.println("terms : "+jsonObject.get(y));
                             ts++;
                             break;
                         }
@@ -517,17 +488,14 @@ public class JsonConverter {
         }
     }
 
-    private static void analyser(JSONObject jsonObject, String offset) {
+    private void analyser(JSONObject jsonObject, String offset) {
         for (Object objj : jsonObject.keySet().toArray()) {
             String obj = (String) objj;
             switch (obj) {
                 case "bool": {
                     print("bool", offset);
                     JSONObject child = ((JSONObject) jsonObject.get("bool"));
-//                    System.out.println(child);
-//                    System.out.println(jsonObject);
                     for (Object xx : (child.keySet().toArray())) {
-//                        System.out.println(xx);
                         String x = (String) xx;
                         JSONObject j = new JSONObject();
                         j.put(x, child.get(x));
@@ -546,8 +514,6 @@ public class JsonConverter {
                     break;
                 }
                 default: {
-//                    System.out.println(obj);
-//                    System.out.println(jsonObject.get(obj));
                 }
             }
         }
@@ -555,74 +521,48 @@ public class JsonConverter {
 
 
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException, ParseException {
-        String[] unOptQueries = {
-//                "json5",
-//                "json6",
-//                "json7", "json8",
-//                "json13",
-//                "json14",
-//                "json15",
-//                "json16",
-//                "json8"
-//                ,"json7","json14","json15","json16"
-                "demo"
-        };
+        String[] unOptQueries = {"demo"};
         FileWriter fw22 = null;
-        fw22 = new FileWriter("src/main/java/" + "OptimizedQueryLog");
+        fw22 = new FileWriter("src/main/Files/" + "OptimizedQueryLog");
+        Map<String, Long> optTimeMap = new HashMap<>();
         for (String x : unOptQueries) {
-            FileReader fileReader2 = new FileReader("src/main/java/" + x);
+            FileReader fileReader2 = new FileReader("src/main/Files/" + x);
             Object obj2;
-            System.out.println("json query : "+x);
+            System.out.println("json query : " + x);
             obj2 = jsonParser.parse(fileReader2);
             unoptLength = ((JSONObject) obj2).toString().length();
-            BufferedReader in = new BufferedReader(new FileReader("src/main/java/" + x));
-            String line;
-            StringBuilder sb = new StringBuilder();
-            while ((line = in.readLine()) != null) {
-                sb.append(line);
-            }
-
-//            System.out.println(sb.length());
-//            System.out.println(obj2.toString().length());
-            in.close();
             extra_size = 0;
             optLength = 0;
-            optTime=0L;
+            optTime = 0L;
             maxPercent = new ArrayList<>();
             optSize = new ArrayList<>();
             unoptSize = new ArrayList<>();
-//            long start = System.nanoTime();
-            JSONObject jsonObject = (JSONObject) converter(obj2);
-//            long end = System.nanoTime();
-            System.out.println("optimization time : " + optTime+"ms");
+            JsonConverter jsonConverter = new JsonConverter();
+            JSONObject jsonObject = (JSONObject) jsonConverter.converter(obj2);
+            optTimeMap.put(x, optTime);
             optLength = (jsonObject).toString().length();
-//            System.out.println("Extra Size : " + extra_size);
             FileWriter fw2 = null;
             try {
-                fw2 = new FileWriter("src/main/java/" + x + "-2");
+                fw2 = new FileWriter("src/main/Files/" + x + "-2");
                 fw2.write(jsonObject.toString());
                 fw2.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
             try {
-                fw22.append("Unoptimimized Query : " + x + "\nUnoptimized Query(without caching) : "+x+"-1\nOptimized Query : " + x + "-2\nUnoptimized Query Size : " + unoptLength + "\nUnoptimized Query(without caching) Size:"+(unoptLength-extra_size)+"\nOptimized Query Size :" + (optLength ) + "\n_Cache_Key Size : "+extra_size+"\n");
+                fw22.append("Unoptimimized Query : " + x + "\nUnoptimized Query(without caching) : " + x + "-1\nOptimized Query : " + x + "-2\nUnoptimized Query Size : " + unoptLength + "\nUnoptimized Query(without caching) Size:" + (unoptLength - extra_size) + "\nOptimized Query Size :" + (optLength) + "\n_Cache_Key Size : " + extra_size + "\n");
                 fw22.append("Size Reductions : " + (unoptLength - optLength - extra_size) + "\nBool Query Optimization % : \n");
-                int counter = 0;
-//                for (Double d : maxPercent) {
-//                    fw22.append((++counter) + ") " + d * 100 + "% \n");
-//                }
-//                fw22.append("\n");
+                fw22.append("Percentage Optimization in Size : " + (unoptLength - optLength - extra_size)*(100) / (unoptLength - extra_size) + "%\n");
             } catch (IOException e) {
                 e.printStackTrace();
             }
             try {
-                fw2 = new FileWriter("src/main/java/" + x + "-1");
+                fw2 = new FileWriter("src/main/Files/" + x + "-1");
                 unoptimized = true;
-                addTime=false;
-                JSONObject jsonObject1 = (JSONObject) converter(obj2);
+                addTime = false;
+                JSONObject jsonObject1 = (JSONObject) jsonConverter.converter(obj2);
                 unoptimized = false;
-                addTime=true;
+                addTime = true;
                 fw2.write(jsonObject1.toString());
                 fw2.close();
             } catch (IOException e) {
@@ -630,6 +570,8 @@ public class JsonConverter {
             }
         }
         fw22.close();
-
+        for(Map.Entry<String,Long>e : optTimeMap.entrySet()){
+            System.out.println(e);
+        }
     }
 }
