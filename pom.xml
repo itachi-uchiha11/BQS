@@ -24,6 +24,14 @@
             <artifactId>elasticsearch</artifactId>
             <version>1.4.1</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/com.vividsolutions/jts -->
+        <dependency>
+            <groupId>com.vividsolutions</groupId>
+            <artifactId>jts</artifactId>
+            <version>1.13</version>
+        </dependency>
+
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>

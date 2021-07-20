@@ -2,16 +2,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.logicng.formulas.*;
+
+import java.text.Normalizer;
 import java.util.Map.Entry;
-import org.logicng.transformations.simplification.AdvancedSimplifier;
-import org.logicng.transformations.simplification.BackboneSimplifier;
-import org.logicng.transformations.simplification.DefaultRatingFunction;
-import org.logicng.transformations.simplification.RatingFunction;
+
+import org.logicng.transformations.simplification.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBuilderT> {
+public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT, QueryBuilderT> {
 
     private final Class<BoolQueryBuilderT> clz;
     private final BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader;
@@ -19,9 +19,27 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
     private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
     private final LeafQueryHelper<QueryBuilderT> leafQueryHelper;
     private final RatingFunction<Integer> ratingFunction;
+    private final BackboneSimplifier backboneSimplifier = new BackboneSimplifier();
+    private final FactorOutSimplifier factorOutSimplifier = new FactorOutSimplifier();
+    private final NegationSimplifier negationSimplifier = new NegationSimplifier();
+    private boolean useAdvancedSimplifier = false;
+    private boolean prefixOn = false;
 
     private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
-                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder,RatingFunction ratingFunction,LeafQueryHelper<QueryBuilderT>leafQueryHelper){
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, RatingFunction ratingFunction, LeafQueryHelper<QueryBuilderT> leafQueryHelper, boolean prefixOn) {
+
+        this.clz = clz;
+        this.clauseReader = clauseReader;
+        this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
+        this.queryBuilder = queryBuilder;
+        this.ratingFunction = ratingFunction;
+        this.leafQueryHelper = leafQueryHelper;
+        this.prefixOn = prefixOn;
+
+    }
+
+    private BoolQuerySimplifier(Class<BoolQueryBuilderT> clz, BooleanClauseReader<BoolQueryBuilderT, QueryBuilderT> clauseReader,
+                                EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier, QueryBuilderHelper<BoolQueryBuilderT, QueryBuilderT> queryBuilder, RatingFunction ratingFunction, LeafQueryHelper<QueryBuilderT> leafQueryHelper) {
 
         this.clz = clz;
         this.clauseReader = clauseReader;
@@ -34,58 +52,70 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
     // 2 different static factory methods
     // based on whether user provides RatingFunction or not
-    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder){
-
+    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder, boolean prefixOn) {
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
         DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
-
-        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper,defaultRatingFunction,esBoolQueryHelper).optimize(boolquerybuilder);
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, defaultRatingFunction, esBoolQueryHelper, prefixOn).optimize(boolquerybuilder);
     }
 
-    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder,RatingFunction<Integer> ratingFunction){
-
+    public static QueryBuilder optimizeBoolQueryBuilder(BoolQueryBuilder boolquerybuilder) {
         EsBoolQueryHelper esBoolQueryHelper = new EsBoolQueryHelper();
-
-        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper,ratingFunction,esBoolQueryHelper).optimize(boolquerybuilder);
+        DefaultRatingFunction defaultRatingFunction = new DefaultRatingFunction();
+        return new BoolQuerySimplifier<>(BoolQueryBuilder.class, esBoolQueryHelper, esBoolQueryHelper, esBoolQueryHelper, defaultRatingFunction, esBoolQueryHelper).optimize(boolquerybuilder);
     }
 
     //Instantiates a new State object
     //calls convertToFormula followed by convertToQuery
-    private QueryBuilderT optimize(BoolQueryBuilderT boolQueryBuilder){
-
+    private QueryBuilderT optimize(BoolQueryBuilderT boolQueryBuilder) {
         State<QueryBuilderT> state = new State<>(equalsAndHashCodeSupplier);
-        Formula optimized = convertToFormula(boolQueryBuilder,state);
-//        System.out.println(optimized);
-        return convertToQuery(optimized,state);
+        Formula optimized = convertToFormula(boolQueryBuilder, state);
+        QueryBuilderT queryBuilderT = convertToQuery(optimized, state);
+        return queryBuilderT;
     }
 
     //Converts the BoolQueryBuilder object into
     //optimized Formula object
-    private Formula convertToFormula(BoolQueryBuilderT boolQueryBuilder, State state){
+    private Formula convertToFormula(BoolQueryBuilderT boolQueryBuilder, State state) {
+        Map<BooleanClauseType, List<QueryBuilderT>> allclauses = clauseReader.getAllClauses(boolQueryBuilder);
 
-        Map<BooleanClauseType,List<QueryBuilderT>>allclauses = clauseReader.getAllClauses(boolQueryBuilder);
         List<Formula> formulas = new ArrayList<>();
+
         List<QueryBuilderT> clauses = allclauses.get(BooleanClauseType.MUST);
-//        System.out.println("got must");
-        if(SprinklrCollectionUtils.isNotEmpty(clauses)){
-            List<Formula> mustFormulae = addClauses(clauses,state);
-            Formula formula = simplifyFormula(state.formulaFactory.and(mustFormulae));
+        if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
+            List<Formula> mustFormulae = addClauses(clauses, state);
+            Formula formula;
+//            if(mustFormulae.size()==1){
+//                formula = mustFormulae.get(0);
+//            }
+//            else {
+            formula = simplifyFormula(state.formulaFactory.and(mustFormulae));
+//            }
             formulas.add(formula);
         }
+
         clauses = allclauses.get(BooleanClauseType.SHOULD);
-//        System.out.println("got should");
-        if(SprinklrCollectionUtils.isNotEmpty(clauses)){
-            List<Formula> shouldFormulae = addClauses(clauses,state);
-//            System.out.println("got should formulas");
-            Formula formula = simplifyFormula(state.formulaFactory.or(shouldFormulae));
-//            System.out.println("got optimized should formula");
+        if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
+            List<Formula> shouldFormulae = addClauses(clauses, state);
+            Formula formula;
+//            if(shouldFormulae.size()==1){
+//                formula = shouldFormulae.get(0);
+//            }
+//            else {
+            formula = simplifyFormula(state.formulaFactory.or(shouldFormulae));
+//            }
             formulas.add(formula);
         }
+
         clauses = allclauses.get(BooleanClauseType.MUST_NOT);
-//        System.out.println("got must_not");
-        if(SprinklrCollectionUtils.isNotEmpty(clauses)){
-            List<Formula> mustNotFormulae = addClauses(clauses,state);
-            Formula formula = simplifyFormula(state.formulaFactory.not(state.formulaFactory.or(mustNotFormulae)));
+        if (SprinklrCollectionUtils.isNotEmpty(clauses)) {
+            List<Formula> mustNotFormulae = addClauses(clauses, state);
+            Formula formula;
+//            if(mustNotFormulae.size()==1){
+//                formula = mustNotFormulae.get(0);
+//            }
+//            else {
+            formula = simplifyFormula(state.formulaFactory.not(state.formulaFactory.or(mustNotFormulae)));
+//            }
             formulas.add(formula);
         }
 
@@ -94,60 +124,59 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
     //returns list of Formula objects
     //from List of QueryBuilder objects
-    private List<Formula> addClauses(List<QueryBuilderT> clauses,State state){
+    private List<Formula> addClauses(List<QueryBuilderT> clauses, State state) {
         List<Formula> formulas = new ArrayList<>();
-//        System.out.println("registering");
-        for(QueryBuilderT clause : clauses){
-            if(clz.isAssignableFrom(clause.getClass())){
+        for (QueryBuilderT clause : clauses) {
+            if (clz.isAssignableFrom(clause.getClass())) {
                 //checks for recursive bool query
-                formulas.add(convertToFormula((BoolQueryBuilderT) clause,state));
-            }
-            else{
+                formulas.add(convertToFormula((BoolQueryBuilderT) clause, state));
+            } else {
                 //in case of non bool query, register clause and return Formula object
                 formulas.add(state.getVariable(clause));
             }
         }
-//        System.out.println("ended listing");
 
         return formulas;
     }
 
     //simplifies Formula object into a reduced equivalent Formula object
-    // using AdvancedSimplifier object
-    private Formula simplifyFormula(Formula formula){
+    private Formula simplifyFormula(Formula formula) {
 
-        BackboneSimplifier advancedSimplifier = new BackboneSimplifier();
-//        System.out.println("before simplifiecation");
-//        System.out.println(formula.literals().size());
-        Formula simplified_formula = advancedSimplifier.apply(formula,false);
-//        System.out.println(simplified_formula.toString());
-//        System.out.println("applied simplifiecation");
-        return simplified_formula;
+        if (useAdvancedSimplifier) {
+            AdvancedSimplifier advancedSimplifier = new AdvancedSimplifier(ratingFunction);
+            return advancedSimplifier.apply(formula, false);
+        }
+        formula = backboneSimplifier.apply(formula, false);
+        formula = factorOutSimplifier.apply(formula, false);
+        formula = negationSimplifier.apply(formula, false);
+
+        return formula;
+
     }
 
     //handles compound Formula objects and
     //recursively calls convertToQuery on children Formula objects
-    private BoolQueryBuilderT handleCompound(Iterator<Formula> formulae,BooleanClauseType clauseType,State state){
+    private BoolQueryBuilderT handleCompound(Iterator<Formula> formulae, BooleanClauseType clauseType, State state) {
 
         BoolQueryBuilderT boolQueryBuilder = queryBuilder.newBoolQuery();
 
-        while(formulae.hasNext()){
+        while (formulae.hasNext()) {
             Formula formula = formulae.next();
-            queryBuilder.addClause(boolQueryBuilder,clauseType, convertToQuery(formula,state));
+            queryBuilder.addClause(boolQueryBuilder, clauseType, convertToQuery(formula, state));
         }
 
         return boolQueryBuilder;
     }
 
-    private List<QueryBuilderT> reduceLeafClauses(List<QueryBuilderT> leafClauses,BooleanClauseType booleanClauseType){
-        if(booleanClauseType == BooleanClauseType.MUST){
+    private List<QueryBuilderT> reduceLeafClauses(List<QueryBuilderT> leafClauses, BooleanClauseType booleanClauseType) {
+        if (booleanClauseType == BooleanClauseType.MUST) {
             //disabled due to correctness break
             return leafClauses;
         }
-        return leafQueryHelper.reduce(leafClauses,LeafQueryHelper.Type.OR);
+        return leafQueryHelper.reduce(leafClauses, LeafQueryHelper.Type.OR);
     }
 
-    private QueryBuilderT singleTypeSingleClause(Map<BooleanClauseType, List<QueryBuilderT>> reducedClauses){
+    private QueryBuilderT singleTypeSingleClause(Map<BooleanClauseType, List<QueryBuilderT>> reducedClauses) {
         if (reducedClauses.size() == 1) {
             Entry<BooleanClauseType, List<QueryBuilderT>> entry = reducedClauses.entrySet().iterator().next();
             switch (entry.getKey()) {
@@ -161,7 +190,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
         return null;
     }
 
-    private BoolQueryBuilderT reduce(BoolQueryBuilderT boolQueryBuilder){
+    private BoolQueryBuilderT reduce(BoolQueryBuilderT boolQueryBuilder) {
         Map<BooleanClauseType, List<QueryBuilderT>> allClauses = clauseReader.getAllClauses(boolQueryBuilder);
         Map<BooleanClauseType, List<QueryBuilderT>> reducedClauses = new HashMap<>();
         for (Entry<BooleanClauseType, List<QueryBuilderT>> entry : allClauses.entrySet()) {
@@ -169,7 +198,7 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
             List<QueryBuilderT> clauses = entry.getValue();
             Set<Holder<QueryBuilderT>> leafClauses = new HashSet<>();
             for (QueryBuilderT clause : clauses) {
-                if (clauseReader.isLeafClause(clause)) {
+                if (clauseReader.isLeafClause(clause, prefixOn)) {
                     leafClauses.add(new Holder<>(clause, equalsAndHashCodeSupplier));
                 } else {
                     SprinklrCollectionUtils.addToMultivaluedMapList(reducedClauses, type, clause);
@@ -184,14 +213,14 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
         }
         BoolQueryBuilderT result = null;
         result = (BoolQueryBuilderT) singleTypeSingleClause(reducedClauses);
-        if(result != null){
+        if (result != null) {
             return result;
         }
         result = queryBuilder.newBoolQuery();
-        for(Entry<BooleanClauseType, List<QueryBuilderT>> entry : reducedClauses.entrySet()){
+        for (Entry<BooleanClauseType, List<QueryBuilderT>> entry : reducedClauses.entrySet()) {
             BooleanClauseType type = entry.getKey();
-            for(QueryBuilderT queryBuilderT : entry.getValue()){
-                queryBuilder.addClause(result,type,queryBuilderT);
+            for (QueryBuilderT queryBuilderT : entry.getValue()) {
+                queryBuilder.addClause(result, type, queryBuilderT);
             }
         }
         return result;
@@ -199,34 +228,34 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
     //converts optimized Formula object into
     //Equivalent QueryBuilder form
-    private QueryBuilderT convertToQuery(Formula formula, State state){
+    private QueryBuilderT convertToQuery(Formula formula, State state) {
 
-        switch(formula.type()){
-            case TRUE:{
+        switch (formula.type()) {
+            case TRUE: {
                 return queryBuilder.newMatchAllQuery();
             }
-            case FALSE:{
+            case FALSE: {
                 return queryBuilder.newMatchNoneQuery();
             }
-            case AND:{
+            case AND: {
                 And and = (And) formula;
-                return reduce(handleCompound(and.iterator(),BooleanClauseType.MUST,state));
+                return reduce(handleCompound(and.iterator(), BooleanClauseType.MUST, state));
             }
-            case OR:{
+            case OR: {
                 Or or = (Or) formula;
-                return reduce(handleCompound(or.iterator(),BooleanClauseType.SHOULD,state));
+                return reduce(handleCompound(or.iterator(), BooleanClauseType.SHOULD, state));
             }
-            case NOT:{
+            case NOT: {
                 Not not = (Not) formula;
-                return reduce(handleCompound(not.iterator(),BooleanClauseType.MUST_NOT,state));
+                return reduce(handleCompound(not.iterator(), BooleanClauseType.MUST_NOT, state));
             }
-            case LITERAL:{
+            case LITERAL: {
                 Literal literal = (Literal) formula;
                 boolean phase = literal.phase();
                 QueryBuilderT queryBuilder1 = (QueryBuilderT) state.getBuilder(literal.name());
-                if(!phase){
+                if (!phase) {
                     BoolQueryBuilderT boolQueryBuilder = queryBuilder.newBoolQuery();
-                    queryBuilder.addClause(boolQueryBuilder,BooleanClauseType.MUST_NOT,queryBuilder1);
+                    queryBuilder.addClause(boolQueryBuilder, BooleanClauseType.MUST_NOT, queryBuilder1);
                     return boolQueryBuilder;
                 }
                 return queryBuilder1;
@@ -238,13 +267,13 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
     //stores important class-wide entities -
     //HashMaps, FormulaFactory instantiation
-    private static class State<QueryBuilderT>{
+    private static class State<QueryBuilderT> {
 
         private FormulaFactory formulaFactory = new FormulaFactory();
-        private Map<Holder<QueryBuilderT>,String> variableMap = new HashMap<>();
-        private Map<String,QueryBuilderT> builderMap = new HashMap<>();
+        private Map<Holder<QueryBuilderT>, String> variableMap = new HashMap<>();
+        private Map<String, QueryBuilderT> builderMap = new HashMap<>();
         private final EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier;
-        private int varNo=0;
+        private int varNo = 0;
 
 
         public State(EqualsAndHashCodeSupplier<QueryBuilderT> equalsAndHashCodeSupplier) {
@@ -253,19 +282,19 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
 
         //stores and retrieves varNames for
         //QueryBuilder objects using Hashmaps
-        public Variable getVariable(QueryBuilderT queryBuilder){
-            Holder<QueryBuilderT> holder = new Holder<>(queryBuilder,equalsAndHashCodeSupplier);
+        public Variable getVariable(QueryBuilderT queryBuilder) {
+            Holder<QueryBuilderT> holder = new Holder<>(queryBuilder, equalsAndHashCodeSupplier);
             String variable = variableMap.get(holder);
-            if(StringUtils.isBlank(variable)){
+            if (StringUtils.isBlank(variable)) {
                 variable = "Var" + ++varNo;
-                variableMap.put(holder,variable);
-                builderMap.put(variable,queryBuilder);
+                variableMap.put(holder, variable);
+                builderMap.put(variable, queryBuilder);
             }
             return formulaFactory.variable(variable);
         }
 
         //retrieves QueryBuilder object
-        public QueryBuilderT getBuilder(String variable){
+        public QueryBuilderT getBuilder(String variable) {
             return builderMap.get(variable);
         }
 
@@ -278,15 +307,19 @@ public class BoolQuerySimplifier<BoolQueryBuilderT extends QueryBuilderT,QueryBu
         private final T obj;
         private final EqualsAndHashCodeSupplier<T> equalsAndHashCodeSupplier;
 
-        public Holder(T obj,EqualsAndHashCodeSupplier<T>equalsAndHashCodeSupplier) {
+        public Holder(T obj, EqualsAndHashCodeSupplier<T> equalsAndHashCodeSupplier) {
             this.obj = obj;
             this.equalsAndHashCodeSupplier = equalsAndHashCodeSupplier;
         }
 
         @Override
         public boolean equals(Object o) {
-            if(this == o){return true;}
-            if(o == null||getClass()!=o.getClass()){return false;}
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             Holder<T> holder = (Holder<T>) o;
             return equalsAndHashCodeSupplier.areEqual(obj, holder.obj);
         }

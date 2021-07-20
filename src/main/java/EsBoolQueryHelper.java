@@ -19,6 +19,10 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     private static final Field termValue = ReflectionUtils.findField(TermQueryBuilder.class, "value");
     private static final Field termsName = ReflectionUtils.findField(TermsQueryBuilder.class, "name");
     private static final Field termsValue = ReflectionUtils.findField(TermsQueryBuilder.class, "values");
+    private static final Field prefName = ReflectionUtils.findField(PrefixQueryBuilder.class,"name");
+    private static final Field prefValue = ReflectionUtils.findField(PrefixQueryBuilder.class,"prefix");
+
+
 
 
     //static block to set field accessible
@@ -30,6 +34,8 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         termValue.setAccessible(true);
         termsName.setAccessible(true);
         termsValue.setAccessible(true);
+        prefName.setAccessible(true);
+        prefValue.setAccessible(true);
     }
 
     private final IdentityHashMap<QueryBuilder, Integer> queryHashCodeMap = new IdentityHashMap<>();
@@ -78,8 +84,9 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     }
 
     @Override
-    public boolean isLeafClause(QueryBuilder clause) {
-        return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder);
+    public boolean isLeafClause(QueryBuilder clause,boolean PrefixOn) {
+        if(PrefixOn) return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder || clause instanceof PrefixQueryBuilder);
+        return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder );
     }
 
     @Override
@@ -120,15 +127,15 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
 
     @Override
     public boolean areEqual(QueryBuilder f1, QueryBuilder f2) {
-        return Objects.equals(getStringRepresentation(f1), getStringRepresentation(f2));
+        return Objects.equals(getString(f1), getString(f2));
     }
 
     @Override
     public int hashCode(QueryBuilder f1) {
-        return queryHashCodeMap.computeIfAbsent(f1, queryBuilder -> getStringRepresentation(queryBuilder).hashCode());
+        return queryHashCodeMap.computeIfAbsent(f1, queryBuilder -> getString(queryBuilder).hashCode());
     }
 
-    private String getStringRepresentation(QueryBuilder queryBuilder) {
+    private String getString(QueryBuilder queryBuilder) {
         return queryMap.computeIfAbsent(queryBuilder, new Function<QueryBuilder, String>() {
             @Override
             public String apply(QueryBuilder queryBuilder) {
@@ -197,7 +204,7 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         else{
             switch(type){
                 case AND:{
-                    //dsabled
+                    //disabled
                     break;
                 }
                 case OR:{
@@ -221,7 +228,7 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         else{
             switch(type){
                 case AND:{
-                    //dsabled
+                    //disabled
                     break;
                 }
                 case OR:{
@@ -231,13 +238,30 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
             }
         }
     }
+    private void addPrefixStrings(QueryBuilder queryBuilder,Type type,Map<String,List<String>> prefixAndValues){
+        String name = ReflectionUtils.getField(prefName,queryBuilder).toString();
+        String value = ReflectionUtils.getField(prefValue,queryBuilder).toString();
+        List<String>s = prefixAndValues.get(name);
+        if(s==null){
+            s = new ArrayList<>();
+            s.add(value);
+            prefixAndValues.put(name,s);
+        }
+        else{
+            s.add(value);
+        }
+    }
 
     @Override
     public List<QueryBuilder> reduce(List<QueryBuilder> leafClauses, Type type) {
         Map<String, Set<Object>>fieldAndValues = new HashMap<>();
         List<QueryBuilder> reducedBuilders = new ArrayList<>();
+        Map<String,List<String>>prefixAndValues = new HashMap<>();
         for(QueryBuilder leaf : leafClauses){
-            if(leaf instanceof TermQueryBuilder){
+            if(leaf instanceof PrefixQueryBuilder){
+                addPrefixStrings(leaf,type,prefixAndValues);
+            }
+            else if(leaf instanceof TermQueryBuilder){
                 reduceTermQueryBuilder(leaf,type,fieldAndValues);
             }
             else if(leaf instanceof TermsQueryBuilder && reduceTermsQueryBuilder(leaf,type,fieldAndValues)){
@@ -247,12 +271,20 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
                 reducedBuilders.add(leaf);
             }
         }
+            for (Entry<String, List<String>> e : prefixAndValues.entrySet()) {
+                Trie trie = new Trie();
+                List<String> s = e.getValue();
+                String k = e.getKey();
+                s.sort(Comparator.comparingInt(String::length));
+                for (String x : s) {
+                    if (trie.insert(x)) {
+                        reducedBuilders.add(new PrefixQueryBuilder(k, x));
+                    }
+                }
+            }
         for(Entry<String,Set<Object>> entry : fieldAndValues.entrySet()){
             if(SprinklrCollectionUtils.isEmpty(entry.getValue())){
                 reducedBuilders.add(0,newMatchNoneQuery());
-            }
-            else if(entry.getValue().size()==1){
-                reducedBuilders.add(new TermQueryBuilder(entry.getKey(),entry.getValue().toArray()[0]));
             }
             else{
                 reducedBuilders.add(new TermsQueryBuilder(entry.getKey(),entry.getValue()));

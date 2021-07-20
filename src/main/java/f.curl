@@ -1,0 +1,23 @@
+for y in $(seq 1 7); do
+for x in _ a b; do
+for i in $(seq 1 10); do
+curl 'https://prod-red.sprinklr.com/query-executor/api/v1/query-executor/elasticsearch' \
+-w "\n"\
+  -H 'authority: prod-red.sprinklr.com' \
+  -H 'sec-ch-ua: " Not;A Brand";v="99", "Google Chrome";v="91", "Chromium";v="91"' \
+  -H 'accept: application/json, text/javascript, */*; q=0.01' \
+  -H 'x-requested-with: XMLHttpRequest' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36' \
+  -H 'content-type: application/json; charset=UTF-8' \
+  -H 'origin: https://prod-red.sprinklr.com' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'accept-language: en-GB,en-US;q=0.9,en;q=0.8' \
+  -H 'cookie: mutiny.user.token=8425a2c1-69de-4a40-a33f-64e776bb9c87; __gtm_referrer=https%3A%2F%2Fwww.google.com%2F; _hjTLDTest=1; _hjid=506d6ac9-ae7c-4849-b4e0-1ff71ed776e6; ajs_anonymous_id=%22d6cc89c1-8786-4b9a-88bd-5a808882cfad%22; _gcl_au=1.1.2009041083.1625195906; __gtm_utmzz=utmcsr=google|utmcmd=owned-organic|utmccn=(not set)|utmctr=(not provided); __gtm_utmzzses=1; __gtm_lp=www.sprinklr.com/contact-us/; __gtm_lreferrer=[object Object]; _ga=GA1.1.1647915979.1625195905; _uetvid=2a39edd0dae411eb8f9b631dfe4370d7; __hstc=56737269.8139ddf1bc638aaff2beafc42423cac4.1625195906190.1625195906190.1625195906190.1; hubspotutk=8139ddf1bc638aaff2beafc42423cac4; __hssrc=1; _fbp=fb.1.1625195906351.95131007; _ga_GD43S3NXZ0=GS1.1.1625200030.2.0.1625200030.60; SESSION=931d82f4-4571-48bf-9598-8d940f43c700; SPR_RED_COOKIE=NGQ3MzE5N2UtNDMxYy00ZmY4LTkwOWYtMjRjNTcwYjJjOGEy' \
+  -d @f$y$x.json \
+  --compressed >> "f$y$x-out.json"
+done
+done
+done

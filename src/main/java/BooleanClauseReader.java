@@ -9,5 +9,5 @@ interface BooleanClauseReader<BoolFilterBuilder, FilterBuilder> {
         return getAllClauses(filterBuilder).get(clauseType);
     }
 
-    boolean isLeafClause(FilterBuilder clause);
+    boolean isLeafClause(FilterBuilder clause,boolean PrefixOn);
 }
