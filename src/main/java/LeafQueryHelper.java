@@ -1,11 +1,11 @@
 import java.util.List;
 
-interface LeafQueryHelper<QueryBuilder> {
+interface LeafQueryHelper<Filter> {
 
-    List<QueryBuilder> reduce(List<QueryBuilder> leafClauses, Type type);
+    List<Filter> reduce(List<Filter> leafClauses, Type type);
 
     enum Type {
-        AND, OR;
+        INTERSECTION, UNION;
     }
 
 }

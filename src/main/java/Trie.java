@@ -1,17 +1,17 @@
+import java.util.HashMap;
+import java.util.Map;
+
 class Trie {
-    static final int ALPHABET_SIZE = 260;
     private boolean printPrefixesFound=true;
     public void setPrintPrefixesFound(boolean b){
         printPrefixesFound = b;
     }
     private class TrieNode
     {
-        TrieNode[] children = new TrieNode[ALPHABET_SIZE];
+        Map<Character,TrieNode> children = new HashMap<>();
         boolean isEndOfWord;
         TrieNode(){
             isEndOfWord = false;
-            for (int i = 0; i < ALPHABET_SIZE; i++)
-                children[i] = null;
         }
     }
     private TrieNode root = new TrieNode();
@@ -21,7 +21,7 @@ class Trie {
     {
         int level;
         int length = key.length();
-        int index;
+        char currChar;
 
         TrieNode pCrawl = root;
 
@@ -34,21 +34,28 @@ class Trie {
 
                 return false;
             }
-            index = key.charAt(level) - 'a'+97;
-            if (pCrawl.children[index] == null)
-                pCrawl.children[index] = new TrieNode();
-
-            pCrawl = pCrawl.children[index];
+            currChar = key.charAt(level);
+            TrieNode node = pCrawl.children.get(currChar);
+            if(node==null){
+                pCrawl.children.put(currChar,new TrieNode());
+            }
+            pCrawl = pCrawl.children.get(currChar);
         }
 
         // if prefix encountered : no addition necessary
         if(pCrawl.isEndOfWord){
             //debugging purposes
             if(printPrefixesFound)System.out.println("String : "+key+"\nPrefix : "+key);
-
             return false;
         }
         pCrawl.isEndOfWord = true;
         return true;
     }
+//    public static void main(String[] args){
+//        Trie trie = new Trie();
+//        String[] strings = {"str1","str12","str3","str324","str2","str2","str2","str","China-中国","China-中国ppp"};
+//        for(String x:strings){
+//            System.out.println(trie.insert(x)+" ");
+//        }
+//    }
 }

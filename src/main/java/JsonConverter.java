@@ -265,7 +265,7 @@ public class JsonConverter {
         // returns optimized query
         else {
             long start = System.nanoTime();
-            queryBuilder = BoolQuerySimplifier.optimizeBoolQueryBuilder(boolQueryBuilder);
+            queryBuilder = QueryTreeOptimizer.optimizeBoolQueryBuilder(boolQueryBuilder);
             long end = System.nanoTime();
             if (addTime) optTime += (end - start) / (1000 * 1000);
         }

@@ -20,7 +20,7 @@ public class Tests {
         temp.should(temp4);
         temp.should(temp5);
         target.must(temp);
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
@@ -33,7 +33,7 @@ public class Tests {
         BoolQueryBuilder unopt = new BoolQueryBuilder();
         MatchAllQueryBuilder target = new MatchAllQueryBuilder();
         unopt.must(new MatchAllQueryBuilder());
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
@@ -62,7 +62,7 @@ public class Tests {
         target2.must(temp);
         target.should(new MatchQueryBuilder("a","China"));
         target.should(target2);
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
@@ -88,7 +88,7 @@ public class Tests {
         target2.should(temp2);
         target2.should(temp);
         target.mustNot(target2);
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
@@ -99,7 +99,7 @@ public class Tests {
     void Test5(){
         BoolQueryBuilder unopt = new BoolQueryBuilder().must(new BoolQueryBuilder().must(new MatchQueryBuilder("a","India")).mustNot(new MatchQueryBuilder("a","India")));
         QueryBuilder target = new BoolQueryBuilder().mustNot(new MatchAllQueryBuilder());
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();
@@ -123,7 +123,7 @@ public class Tests {
         temp.should(temp4);
         temp.should(temp5);
         target.must(temp);
-        QueryBuilder opt = BoolQuerySimplifier.optimizeBoolQueryBuilder(unopt);
+        QueryBuilder opt = QueryTreeOptimizer.optimizeBoolQueryBuilder(unopt);
         String x1 = unopt.toString();
         String x2 = opt.toString();
         String x3 = target.toString();

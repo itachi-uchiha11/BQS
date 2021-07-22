@@ -9,7 +9,7 @@ import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.springframework.util.ReflectionUtils;
 
-class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBuilder>, QueryBuilderHelper<BoolQueryBuilder, QueryBuilder>,
+class EsBoolFilterHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBuilder>, QueryBuilderHelper<BoolQueryBuilder, QueryBuilder>,
         EqualsAndHashCodeSupplier<QueryBuilder>, LeafQueryHelper<QueryBuilder>{
 
     private static final Field mustClauses = ReflectionUtils.findField(BoolQueryBuilder.class, "mustClauses");
@@ -43,6 +43,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
 
 
     @Override
+    public boolean initialized() {
+        return false;
+    }
+
+    @Override
     //returns all member clauses grouped by ClauseType
     public Map<BooleanClauseType, List<QueryBuilder>> getAllClauses(BoolQueryBuilder boolQueryBuilder) {
 
@@ -66,6 +71,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         return result;
     }
 
+    @Override
+    public boolean isCached(BoolQueryBuilder boolQueryBuilder) {
+        return false;
+    }
+
 
     @Override
     //returns clauses of specific ClauseType
@@ -87,6 +97,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
     public boolean isLeafClause(QueryBuilder clause,boolean PrefixOn) {
         if(PrefixOn) return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder || clause instanceof PrefixQueryBuilder);
         return (clause instanceof TermsQueryBuilder || clause instanceof TermQueryBuilder );
+    }
+
+    @Override
+    public boolean isMatchAllQuery(QueryBuilder filter) {
+        return false;
     }
 
     @Override
@@ -203,11 +218,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         }
         else{
             switch(type){
-                case AND:{
+                case INTERSECTION:{
                     //disabled
                     break;
                 }
-                case OR:{
+                case UNION:{
                     values.addAll(filteredValues);
                     break;
                 }
@@ -227,11 +242,11 @@ class EsBoolQueryHelper implements BooleanClauseReader<BoolQueryBuilder, QueryBu
         }
         else{
             switch(type){
-                case AND:{
+                case INTERSECTION:{
                     //disabled
                     break;
                 }
-                case OR:{
+                case UNION:{
                     values.add(value);
                     break;
                 }
